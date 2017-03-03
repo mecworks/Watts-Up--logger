@@ -75,7 +75,8 @@ class WattsUp(object):
                 W = float(fields[3]) / 10;
                 V = float(fields[4]) / 10;
                 A = float(fields[5]) / 1000;
-                print datetime.datetime.now(), W, V, A
+                # print datetime.datetime.now(), W, V, A
+                return (W, V, A)
 
     def log(self, logfile = None):
         print 'Logging...'
