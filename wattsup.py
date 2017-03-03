@@ -1,4 +1,5 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
+
 """record data from WattsUp power meter
 
 Reads data from a Watts Up PRO or compatible power meter (http://www.wattsupmeters.com).
@@ -30,27 +31,30 @@ Time-stamp: <Tue Sep 20 09:14:29 EDT 2011>
 
 """
 
-import os, serial
-import datetime, time
+from platform import uname
 import argparse
 import curses
-from platform import uname
-import numpy as np
+import datetime
 import matplotlib.pyplot as plt
-
+import numpy as np
+import os
+import serial
+import time
 
 EXTERNAL_MODE = 'E'
 INTERNAL_MODE = 'I'
 TCPIP_MODE = 'T'
 FULLHANDLING = 2
+DEBUG = False
 
 
 class WattsUp(object):
+
     def __init__(self, port, interval):
         if args.sim:
-            self.s = open(port,'r')     # not a serial port, but a file
+            self.s = open(port, 'r')     # not a serial port, but a file
         else:
-            self.s = serial.Serial(port, 115200 )
+            self.s = serial.Serial(port, 115200)
         self.logfile = None
         self.interval = interval
         # initialize lists for keeping data
@@ -62,7 +66,7 @@ class WattsUp(object):
     def mode(self, runmode):
         if args.sim:
             return                      # can't set run mode while in simulation
-        self.s.write('#L,W,3,%s,,%d;' % (runmode, self.interval) )
+        self.s.write('#L,W,3,%s,,%d;' % (runmode, self.interval))
         if runmode == INTERNAL_MODE:
             self.s.write('#O,W,1,%d' % FULLHANDLING)
 
@@ -70,27 +74,30 @@ class WattsUp(object):
         if args.sim:
             return                      # can't fetch while in simulation
         for line in self.s:
-            if line.startswith( '#d' ):
+            if line.startswith('#d'):
                 fields = line.split(',')
-                W = float(fields[3]) / 10;
-                V = float(fields[4]) / 10;
-                A = float(fields[5]) / 1000;
-                # print datetime.datetime.now(), W, V, A
-                return (W, V, A)
+                w = float(fields[3]) / 10
+                v = float(fields[4]) / 10
+                a = float(fields[5]) / 1000
+                if DEBUG:
+                    print('{} {} {} {}'.format(datetime.datetime.now(), w, v, a))
+                return w, v, a
 
-    def log(self, logfile = None):
-        print 'Logging...'
+    def log(self, logfile=None):
+        r = None
+        o = None
+        print('Logging...')
         if not args.sim:
             self.mode(EXTERNAL_MODE)
         if logfile:
             self.logfile = logfile
-            o = open(self.logfile,'w')
+            o = open(self.logfile, 'w')
         if args.raw:
-            rawfile = '.'.join([os.path.splitext(self.logfile)[0],'raw'])
+            rawfile = '.'.join([os.path.splitext(self.logfile)[0], 'raw'])
             try:
-                r = open(rawfile,'w')
-            except:
-                print 'Opening raw file %s failed!' % rawfile
+                r = open(rawfile, 'w')
+            except IOError:
+                print('Opening raw file {} failed!'.format(rawfile))
                 args.raw = False
         line = self.s.readline()
         n = 0
@@ -108,44 +115,44 @@ class WattsUp(object):
         while True:
             if args.sim:
                 time.sleep(self.interval)
-            if line.startswith( '#d' ):
+            if line.startswith('#d'):
                 if args.raw:
                     r.write(line)
                 fields = line.split(',')
-                if len(fields)>5:
-                    W = float(fields[3]) / 10;
-                    V = float(fields[4]) / 10;
-                    A = float(fields[5]) / 1000;
+                if len(fields) > 5:
+                    w = float(fields[3]) / 10
+                    v = float(fields[4]) / 10
+                    a = float(fields[5]) / 1000
                     screen.clear()
                     screen.addstr(2, 4, 'Logging to file %s' % self.logfile)
                     screen.addstr(4, 4, 'Time:     %d s' % n)
-                    screen.addstr(5, 4, 'Power:   %3.1f W' % W)
-                    screen.addstr(6, 4, 'Voltage: %5.1f V' % V)
-                    if A<1000:
-                        screen.addstr(7, 4, 'Current: %d mA' % int(A*1000))
+                    screen.addstr(5, 4, 'Power:   %3.1f W' % w)
+                    screen.addstr(6, 4, 'Voltage: %5.1f V' % v)
+                    if a < 1000:
+                        screen.addstr(7, 4, 'Current: %d mA' % int(a*1000))
                     else:
-                        screen.addstr(7, 4, 'Current: %3.3f A' % A)
+                        screen.addstr(7, 4, 'Current: %3.3f A' % a)
                     screen.addstr(9, 4, 'Press "q" to quit ')
-                    #if args.debug:
-                    #    screen.addstr(12, 0, line)
+                    # if args.debug:
+                    #     screen.addstr(12, 0, line)
                     screen.refresh()
                     c = screen.getch()
                     if c in (ord('q'), ord('Q')):
                         break  # Exit the while()
                     if args.plot:
                         self.t.append(float(n))
-                        self.power.append(W)
-                        self.potential.append(V)
-                        self.current.append(A)
+                        self.power.append(w)
+                        self.potential.append(v)
+                        self.current.append(a)
                         fig.clear()
-                        plt.plot(np.array(self.t)/60,np.array(self.power),'r')
+                        plt.plot(np.array(self.t)/60, np.array(self.power), 'r')
                         ax = plt.gca()
                         ax.set_xlabel('Time (minutes)')
                         ax.set_ylabel('Power (W)')
                         # show the plot
                         fig.canvas.draw()
                     if self.logfile:
-                        o.write('%s %d %3.1f %3.1f %5.3f\n' % (datetime.datetime.now(), n, W, V, A))
+                        o.write('%s %d %3.1f %3.1f %5.3f\n' % (datetime.datetime.now(), n, w, v, a))
                     n += self.interval
             line = self.s.readline()
         curses.nocbreak()
@@ -161,7 +168,9 @@ class WattsUp(object):
             except:
                 pass
 
+
 def main(args):
+
     if not args.port:
         system = uname()[0]
         if system == 'Darwin':          # Mac OS X
@@ -170,24 +179,25 @@ def main(args):
             args.port = '/dev/ttyUSB0'
     if not os.path.exists(args.port):
         if not args.sim:
-            print ''
-            print 'Serial port %s does not exist.' % args.port
-            print 'Please make sure FDTI drivers are installed'
-            print ' (http://www.ftdichip.com/Drivers/VCP.htm)'
-            print 'Default ports are /dev/ttyUSB0 for Linux'
-            print ' and /dev/tty.usbserial-A1000wT3 for Mac OS X'
+            print('')
+            print('Serial port {} does not exist.'.format(args.port))
+            print('Please make sure FDTI drivers are installed')
+            print(' (http://www.ftdichip.com/Drivers/VCP.htm)')
+            print('Default ports are /dev/ttyUSB0 for Linux')
+            print(' and /dev/tty.usbserial-A1000wT3 for Mac OS X')
             exit()
         else:
-            print ''
-            print 'File %s does not exist.' % args.port
+            print('')
+            print('File %s does not exist.' % args.port)
     meter = WattsUp(args.port, args.interval)
     if args.log:
         meter.log(args.outfile)
     if args.fetch:
-        print 'WARNING: Fetch mode not working!!!!'
+        print('WARNING: Fetch mode not working!!!!')
         meter.fetch()
     if args.internal:
         meter.mode(INTERNAL_MODE)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Get data from Watts Up power meter.')
